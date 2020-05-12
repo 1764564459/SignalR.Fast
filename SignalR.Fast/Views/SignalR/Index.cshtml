@@ -1,0 +1,118 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+<script src="~/lib/jquery/dist/jquery.js"></script>
+<script src="~/lib/signalr/dist/browser/signalr.js"></script>
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <div>
+        <ul id="tree">
+        </ul>
+    </div>
+    账户：<input name="account" autocomplete="off" />
+    消息：<div id="msg"></div>
+    <button id="sub">提交</button>
+</div>
+
+<script>
+    var connect = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:64844/api/SignalRHub")
+        //.withAutomaticReconnect()//自动重连
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    function Start() {
+        connect.start().catch(err => {
+            setTimeout(() => Start(), 5000);
+        });
+    }
+    //启动联接
+    connect.start().catch(err => {
+        console.error(err);
+    });
+
+    //登录
+    connect.on("Login", (message) => {
+        console.log(message);
+    });
+
+    //获取所有用户信息
+    connect.on("GetClients", (rest) => {
+        console.log(rest);
+        $("#tree").empty();
+        var _html = "";
+        $.each(rest, function (index, item) {
+            _html += `<li value="${item.id}" onclick="send(this)" >id:${item.id},name:${item.name},status:${item.status}</li>`;
+        });
+        $("#tree").append(_html);
+    });
+
+    //监听SendAll命令
+    connect.on("SendAll", (user, message) => {
+        console.log(`${user} say ：${message}`);
+    });
+
+    //发送接收消息
+    connect.on("Send",
+        message => {
+            $("#msg").append(`<p><lable>${message}</lable></p>`);
+        });
+
+    //接收信息
+    connect.on("ReceiveMessage", (user, message) => {
+        console.log(`${user} say ：${message}`);
+    });
+
+
+    //connect.connectionClosed = function (e) {
+    //    console.log("断开连接，", e);
+    //};
+
+    connect.onclose((err) => {
+        console.log("断开连接，", err);
+        Start();
+    });
+
+    //向某个用户发送数据
+    function send(e) {
+        var _Id = $(e).attr("value"),text="Fast SignalR ！！！";
+        connect.invoke("Send", _Id, text).catch(err => {
+            console.error(err);
+        });
+    }
+   
+
+    //提交
+    document.getElementById("sub").onclick = function (e) {
+        e.preventDefault();
+        var _account = $("input[name='account']").val();
+        //登录
+        connect.invoke("Login", _account).catch(err => {
+            console.error(err);
+        });
+
+        //获取用户
+        connect.invoke("GetClients").catch(err => {
+            console.error(err);
+        });
+
+        connect.invoke("SendMessage", "45678").catch(err => {
+            console.error(err);
+        });
+        //两个参数
+        var user = "321231", message = "12313";
+        connect.invoke("SendAll", user, message).catch(err => {
+            console.error(err);
+        });
+
+    };
+
+    ////页面点击重连
+    //document.onclick = function (e) {
+    //    if (connect.state === HubConnectionState.Disconnected) {
+    //        Start();
+    //    }
+    //};
+
+</script>
